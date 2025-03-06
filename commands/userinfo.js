@@ -1,6 +1,13 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const si = require('systeminformation');
 
+// ฟังก์ชั่นสำหรับการบันทึกข้อผิดพลาด
+const logError = (error, context) => {
+  console.error('❌ ข้อผิดพลาดเกิดขึ้น:', context);
+  console.error('ข้อความผิดพลาด:', error.message);
+  console.error('Stack trace:', error.stack);
+};
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('info')  
@@ -10,16 +17,18 @@ module.exports = {
     try {
       await interaction.deferReply(); // ป้องกัน interaction timeout
 
-      const bot = interaction.client.user;
-      const guildCount = interaction.client.guilds.cache.size;
-      const userCount = interaction.client.users.cache.size;
-      const ping = interaction.client.ws.ping;
-      const uptime = Math.floor(interaction.client.uptime / 1000); 
+      // ดึงข้อมูลบอทและเซิร์ฟเวอร์
+      const { user: bot, guilds, users, ws, uptime } = interaction.client;
+      const guildCount = guilds.cache.size;
+      const userCount = users.cache.size;
+      const ping = ws.ping;
 
       // ดึงข้อมูลระบบ
-      const systemData = await si.mem();
-      const cpuLoad = await si.currentLoad();
-      const diskData = await si.fsSize();
+      const [systemData, cpuLoad, diskData] = await Promise.all([
+        si.mem(),
+        si.currentLoad(),
+        si.fsSize()
+      ]);
 
       // คำนวณข้อมูลระบบ
       const totalRAM = (systemData.total / 1024 / 1024 / 1024).toFixed(2);
@@ -33,12 +42,10 @@ module.exports = {
         .setColor('#FF69B4') 
         .setTitle(`ข้อมูลของบอท: ${bot.username}`)
         .setThumbnail(bot.displayAvatarURL({ dynamic: true })) 
-        .setAuthor({ name: bot.username, iconURL: bot.displayAvatarURL({ dynamic: true }) })
-        .setDescription('บอทนี้ถูกสร้างขึ้นเพื่อช่วยจัดการและให้ข้อมูลต่างๆ ในเซิร์ฟเวอร์ Discord!')
         .addFields(
-          { name: '🆔 ชื่อบอท', value: `${bot.globalName || bot.username}`, inline: true }, // ✅ แก้ `bot.discriminator`
+          { name: '🆔 ชื่อบอท', value: bot.globalName || bot.username, inline: true },
           { name: '📅 วันที่สมัคร', value: bot.createdAt.toISOString().split('T')[0], inline: true },
-          { name: '💬 สถานะ', value: bot.presence?.status ?? 'ไม่ออนไลน์', inline: true }, // ✅ ป้องกัน `null`
+          { name: '💬 สถานะ', value: bot.presence?.status ?? 'ไม่ออนไลน์', inline: true },
           { name: '👥 จำนวนผู้ใช้', value: `${userCount}`, inline: true },
           { name: '🌐 จำนวนเซิร์ฟเวอร์', value: `${guildCount}`, inline: true },
           { name: '📶 Ping', value: `${ping} ms`, inline: true },
@@ -50,17 +57,15 @@ module.exports = {
         .setTimestamp()
         .setFooter({
           text: 'ข้อมูลจากบอท Discord',
-          iconURL: bot.displayAvatarURL({ dynamic: true }) 
+          iconURL: bot.displayAvatarURL({ dynamic: true })
         });
 
       // ส่งข้อมูลไปยัง Discord
       await interaction.editReply({ embeds: [botInfoEmbed] });
 
     } catch (error) {
-      console.error('เกิดข้อผิดพลาด:', error);
-      await interaction.editReply({
-        content: '❌ ไม่สามารถดึงข้อมูลบอทได้!',
-      });
+      logError(error, 'ไม่สามารถดึงข้อมูลบอท');
+      await interaction.editReply({ content: '❌ ไม่สามารถดึงข้อมูลบอทได้!' });
     }
   },
 };
