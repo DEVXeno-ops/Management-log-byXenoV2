@@ -1,8 +1,10 @@
-require('dotenv').config();
-const { Client, GatewayIntentBits, Events, Collection, ActivityType } = require('discord.js');
+require('dotenv').config();  // Ensure dotenv is imported
+
+const { Client, GatewayIntentBits, Events, Collection, ActivityType, SlashCommandBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
+// Initialize the client with necessary intents
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -10,20 +12,26 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildBans,
+    GatewayIntentBits.GuildVoiceStates,  // Intent for voice state updates
   ],
 });
 
 client.commands = new Collection();
-const token = process.env.DISCORD_TOKEN || '';
+const token = process.env.DISCORD_TOKEN;
 
-// ฟังก์ชั่นสำหรับการสแกนข้อผิดพลาด
+if (!token) {
+  console.error('❌ DISCORD_TOKEN not found in .env file');
+  process.exit(1);  // Exit the application if token is not provided
+}
+
+// Error logging function
 const logError = (error, context) => {
   console.error('❌ ข้อผิดพลาดเกิดขึ้น:', context);
   console.error('ข้อความผิดพลาด:', error.message);
   console.error('Stack trace:', error.stack);
 };
 
-// โหลดคำสั่งทั้งหมดจากโฟลเดอร์ commands
+// Load commands from the 'commands' directory
 const loadCommands = async () => {
   const commandsPath = path.join(__dirname, 'commands');
   if (!fs.existsSync(commandsPath)) {
@@ -53,10 +61,10 @@ const loadCommands = async () => {
         return null;
       }
     })
-  ).then(commands => commands.filter(Boolean)); // กรองคำสั่งที่โหลดได้สำเร็จ
+  ).then(commands => commands.filter(Boolean)); // Filter valid commands
 };
 
-// ตั้งสถานะบอทแบบหมุนเวียน
+// Rotate bot's status
 const rotateStatus = () => {
   const statuses = [
     { name: 'เซิร์ฟเวอร์ของคุณ 🛡️', type: ActivityType.Watching },
@@ -75,7 +83,7 @@ const rotateStatus = () => {
   }, 30000);
 };
 
-// เมื่อบอทพร้อมใช้งาน
+// When the bot is ready
 client.once(Events.ClientReady, async () => {
   console.log(`🚀 บอทออนไลน์ในชื่อ ${client.user.tag}`);
   const commands = await loadCommands();
@@ -86,11 +94,13 @@ client.once(Events.ClientReady, async () => {
     } catch (error) {
       logError(error, 'ไม่สามารถลงทะเบียนคำสั่ง Slash');
     }
+  } else {
+    console.log('⚠️ ไม่มีคำสั่ง Slash ให้ลงทะเบียน');
   }
   rotateStatus();
 });
 
-// จัดการ Slash Command
+// Handle Slash Commands
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -108,7 +118,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// ล็อกอิน
+// Log in with the bot token
 client.login(token).catch((error) => {
   logError(error, 'ไม่สามารถล็อกอินบอทได้');
 });
