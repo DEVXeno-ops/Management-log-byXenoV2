@@ -10,7 +10,7 @@ const logError = (error, context) => {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('info')  
+    .setName('info')
     .setDescription('แสดงข้อมูลของบอทแบบ real-time'),
 
   async execute(interaction) {
@@ -23,11 +23,11 @@ module.exports = {
       const userCount = users.cache.size;
       const ping = ws.ping;
 
-      // ดึงข้อมูลระบบ
+      // ดึงข้อมูลระบบพร้อมกัน
       const [systemData, cpuLoad, diskData] = await Promise.all([
         si.mem(),
         si.currentLoad(),
-        si.fsSize()
+        si.fsSize(),
       ]);
 
       // คำนวณข้อมูลระบบ
@@ -37,11 +37,11 @@ module.exports = {
       const diskTotal = (diskData[0].size / 1024 / 1024 / 1024).toFixed(2);
       const cpuPercentage = cpuLoad.currentLoad.toFixed(2);
 
-      // Embed ข้อมูลบอท
+      // สร้าง Embed ข้อมูลบอท
       const botInfoEmbed = new EmbedBuilder()
-        .setColor('#FF69B4') 
+        .setColor('#FF69B4')
         .setTitle(`ข้อมูลของบอท: ${bot.username}`)
-        .setThumbnail(bot.displayAvatarURL({ dynamic: true })) 
+        .setThumbnail(bot.displayAvatarURL({ dynamic: true }))
         .addFields(
           { name: '🆔 ชื่อบอท', value: bot.globalName || bot.username, inline: true },
           { name: '📅 วันที่สมัคร', value: bot.createdAt.toISOString().split('T')[0], inline: true },

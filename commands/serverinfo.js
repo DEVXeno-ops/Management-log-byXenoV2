@@ -9,20 +9,22 @@ module.exports = {
     try {
       const guild = interaction.guild;
 
-      // ข้อมูลออนไลน์
+      // ดึงข้อมูลสมาชิกออนไลน์และออฟไลน์
       const onlineMembers = guild.members.cache.filter(member => member.presence?.status === 'online').size;
       const offlineMembers = guild.memberCount - onlineMembers;
 
-      // Icon และ Vanity URL
-      const iconURL = guild.iconURL({ size: 2048 }) || 'https://via.placeholder.com/2048x2048.png?text=No+Icon';
-      const vanityURL = guild.vanityURL ? `https://discord.gg/${guild.vanityURL}` : 'ไม่มี Vanity URL';
+      // ดึงข้อมูล URL ไอคอน และ Vanity URL
+      const iconURLPromise = guild.iconURL({ size: 2048 }) || 'https://via.placeholder.com/2048x2048.png?text=No+Icon';
+      const vanityURLPromise = guild.vanityURL ? `https://discord.gg/${guild.vanityURL}` : 'ไม่มี Vanity URL';
 
-      // เจ้าของเซิร์ฟเวอร์
-      const owner = guild.ownerId ? `<@${guild.ownerId}>` : 'ไม่ทราบเจ้าของ';
+      // ดึงเจ้าของเซิร์ฟเวอร์
+      const ownerPromise = guild.fetchOwner().then(owner => `<@${owner.id}>`).catch(() => 'ไม่ทราบเจ้าของ');
 
-      // สร้าง Embed Message
+      // สร้าง Embed
+      const [iconURL, vanityURL, owner] = await Promise.all([iconURLPromise, vanityURLPromise, ownerPromise]);
+
       const serverInfoEmbed = new EmbedBuilder()
-        .setColor('#FF69B4') 
+        .setColor('#FF69B4')
         .setTitle(`ข้อมูลของเซิร์ฟเวอร์ ${guild.name}`)
         .setThumbnail(iconURL)
         .setAuthor({ name: `${guild.name} - ข้อมูลเซิร์ฟเวอร์`, iconURL })

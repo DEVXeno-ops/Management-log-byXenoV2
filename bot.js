@@ -1,6 +1,7 @@
 require('dotenv').config();  // Ensure dotenv is imported
 
-const { Client, GatewayIntentBits, Events, Collection, ActivityType, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Events, Collection, ActivityType } = require('discord.js');
+const { getGuildSettings, saveGuildSettings } = require('./settings');  // นำเข้าจากไฟล์ settings.js
 const fs = require('fs');
 const path = require('path');
 
@@ -12,7 +13,6 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildBans,
-    GatewayIntentBits.GuildVoiceStates,  // Intent for voice state updates
   ],
 });
 
@@ -45,23 +45,21 @@ const loadCommands = async () => {
     return [];
   }
 
-  return Promise.all(
-    commandFiles.map(async (file) => {
-      try {
-        const command = require(`./commands/${file}`);
-        if (command.data && command.execute) {
-          client.commands.set(command.data.name, command);
-          return command.data.toJSON();
-        } else {
-          console.warn(`⚠️ ไฟล์ ${file} ไม่มีโครงสร้างคำสั่งที่ถูกต้อง`);
-          return null;
-        }
-      } catch (error) {
-        logError(error, `ไม่สามารถโหลดคำสั่งจากไฟล์ ${file}`);
-        return null;
+  const commands = [];
+  for (const file of commandFiles) {
+    try {
+      const command = require(`./commands/${file}`);
+      if (command.data && command.execute) {
+        client.commands.set(command.data.name, command);
+        commands.push(command.data.toJSON());
+      } else {
+        console.warn(`⚠️ ไฟล์ ${file} ไม่มีโครงสร้างคำสั่งที่ถูกต้อง`);
       }
-    })
-  ).then(commands => commands.filter(Boolean)); // Filter valid commands
+    } catch (error) {
+      logError(error, `ไม่สามารถโหลดคำสั่งจากไฟล์ ${file}`);
+    }
+  }
+  return commands;
 };
 
 // Rotate bot's status
@@ -80,7 +78,7 @@ const rotateStatus = () => {
       status: 'online',
     });
     index = (index + 1) % statuses.length;
-  }, 30000);
+  }, 30000);  // Update status every 30 seconds
 };
 
 // When the bot is ready
@@ -100,21 +98,40 @@ client.once(Events.ClientReady, async () => {
   rotateStatus();
 });
 
-// Handle Slash Commands
+// Handle Slash Commands and Button Interactions
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
-
   try {
-    await command.execute(interaction);
+    if (interaction.isCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (command) {
+        try {
+          await command.execute(interaction);
+        } catch (error) {
+          console.error('Error executing command:', error);
+          await interaction.reply({ content: '❌ เกิดข้อผิดพลาดในการทำงานของคำสั่ง', ephemeral: true });
+        }
+      }
+    }
+
+    if (interaction.isButton()) {
+      const customId = interaction.customId;
+
+      // ตรวจสอบเฉพาะปุ่มที่เกี่ยวข้องกับคำสั่ง unban
+      if (customId.startsWith('unban_confirm_')) {
+        const unbanCommand = client.commands.get('unban');
+        if (unbanCommand && unbanCommand.handleInteraction) {
+          try {
+            await unbanCommand.handleInteraction(interaction);
+          } catch (error) {
+            console.error('Error handling button interaction:', error);
+            await interaction.reply({ content: '❌ เกิดข้อผิดพลาดในการยกเลิกการแบน', ephemeral: true });
+          }
+        }
+      }
+    }
   } catch (error) {
-    logError(error, `เกิดข้อผิดพลาดในคำสั่ง ${interaction.commandName}`);
-    await interaction.reply({
-      content: '❌ เกิดข้อผิดพลาดในการดำเนินการคำสั่งนี้!',
-      ephemeral: true,
-    });
+    console.error('Error handling interaction:', error);
+    await interaction.reply({ content: '❌ เกิดข้อผิดพลาดในการทำงานกับ Interaction', ephemeral: true });
   }
 });
 
